@@ -63,7 +63,11 @@
 			return (mainDomain=="gamedistribution.com");
 		} */
 	</script>
-	<script id="gmsoft-jssdk" src="gmsoftsdk_v5-renamed-so-it-cant-fetch.js"></script>
+	<script src="../admin/admin-state.js"></script>
+	<script>
+		// Intentionally disabled: external gmsoft SDK can trigger host checks/redirects to azgames.io.
+		// We run the local repository game code only.
+	</script>
 </head>
 
 <body>
