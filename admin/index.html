@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Escape Road Admin Stream Panel</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: Arial, sans-serif; margin: 0; background: #111827; color: #e5e7eb; }
+    .wrap { max-width: 1000px; margin: 0 auto; padding: 20px; }
+    .card { background: #1f2937; border: 1px solid #374151; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    h1,h2 { margin-top: 0; }
+    label { display: block; margin: 10px 0 6px; font-weight: 600; }
+    input, select, textarea, button { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #4b5563; background: #111827; color: #f9fafb; }
+    button { cursor: pointer; background: #2563eb; border: none; font-weight: 700; }
+    button:hover { background: #1d4ed8; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    iframe { width: 100%; min-height: 70vh; border: 1px solid #4b5563; border-radius: 12px; background: #000; }
+    .small { color: #9ca3af; font-size: 0.9rem; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Escape Road Admin-Only Streaming Panel</h1>
+
+    <section id="authCard" class="card">
+      <h2>Admin Access</h2>
+      <p class="small">This page is client-side only. Change the passcode in <code>admin/index.html</code> before production use.</p>
+      <label for="passcode">Passcode</label>
+      <input id="passcode" type="password" placeholder="Enter admin passcode" />
+      <button id="unlockBtn" style="margin-top: 10px;">Unlock Admin Panel</button>
+    </section>
+
+    <section id="panel" class="card hidden">
+      <h2>Stream Controls</h2>
+      <div class="row">
+        <div>
+          <label for="gameSelect">Game</label>
+          <select id="gameSelect">
+            <option value="escape-road/index.html">Escape Road</option>
+            <option value="escape-road-2/index.html">Escape Road 2</option>
+            <option value="escape-road-city/index.html">Escape Road City</option>
+            <option value="escape-road-city-2/index.html">Escape Road City 2</option>
+            <option value="BROKEN-escape-road-halloween/index.html">Escape Road Halloween (Broken)</option>
+            <option value="BROKEN-escape-road-winter/index.html">Escape Road Winter (Broken)</option>
+          </select>
+        </div>
+        <div>
+          <label for="moneyInput">Money</label>
+          <input id="moneyInput" type="number" min="0" value="100000" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="carsInput">Number of Cars Owned</label>
+          <input id="carsInput" type="number" min="0" value="20" />
+        </div>
+        <div>
+          <label for="allCarsToggle">Unlock all cars?</label>
+          <select id="allCarsToggle">
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
+      </div>
+
+      <label for="carDetails">Optional car list / counts (JSON)</label>
+      <textarea id="carDetails" rows="4" placeholder='{"police": 1, "super": 5}'></textarea>
+      <p class="small">The selected values are injected into localStorage and URL params before streaming.</p>
+
+      <button id="streamBtn">Start Stream</button>
+    </section>
+
+    <section id="playerCard" class="card hidden">
+      <h2>Live Stream Window</h2>
+      <iframe id="gameFrame" allowfullscreen></iframe>
+    </section>
+  </div>
+
+  <script>
+    const ADMIN_PASSCODE = "escape-admin";
+
+    const authCard = document.getElementById("authCard");
+    const panel = document.getElementById("panel");
+    const playerCard = document.getElementById("playerCard");
+
+    document.getElementById("unlockBtn").addEventListener("click", () => {
+      const pass = document.getElementById("passcode").value;
+      if (pass !== ADMIN_PASSCODE) {
+        alert("Invalid passcode");
+        return;
+      }
+      authCard.classList.add("hidden");
+      panel.classList.remove("hidden");
+    });
+
+    document.getElementById("streamBtn").addEventListener("click", () => {
+      const gamePath = document.getElementById("gameSelect").value;
+      const money = Number(document.getElementById("moneyInput").value || 0);
+      const cars = Number(document.getElementById("carsInput").value || 0);
+      const allCarsUnlocked = document.getElementById("allCarsToggle").value === "true";
+      const jsonText = document.getElementById("carDetails").value.trim();
+
+      let carMap = {};
+      if (jsonText) {
+        try {
+          carMap = JSON.parse(jsonText);
+        } catch (e) {
+          alert("Car JSON is invalid. Example: {\"police\": 1, \"super\": 5}");
+          return;
+        }
+      }
+
+      const adminState = {
+        money,
+        cars,
+        allCarsUnlocked,
+        carMap,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const gameId = gamePath.split("/")[0];
+      localStorage.setItem("escapeRoadAdminConfig", JSON.stringify(adminState));
+      localStorage.setItem(`${gameId}:adminConfig`, JSON.stringify(adminState));
+      localStorage.setItem("admin_money", String(money));
+      localStorage.setItem("admin_cars", String(cars));
+      localStorage.setItem("admin_all_cars", String(allCarsUnlocked));
+
+      const qs = new URLSearchParams({
+        admin: "1",
+        money: String(money),
+        cars: String(cars),
+        allCars: String(allCarsUnlocked),
+      }).toString();
+
+      const src = `${location.origin}/${gamePath}?${qs}`;
+      const frame = document.getElementById("gameFrame");
+      frame.src = src;
+
+      frame.onload = () => {
+        try {
+          frame.contentWindow.postMessage({ type: "ESCAPE_ROAD_ADMIN_STATE", payload: adminState }, "*");
+        } catch (_) {}
+      };
+
+      playerCard.classList.remove("hidden");
+    });
+  </script>
+</body>
+</html>
